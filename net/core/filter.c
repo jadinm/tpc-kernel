@@ -4799,25 +4799,70 @@ static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 		}
 #if IS_ENABLED(CONFIG_IPV6)
 	} else if (level == SOL_IPV6) {
-		if (optlen != sizeof(int) || sk->sk_family != AF_INET6)
+		struct ipv6_pinfo *np = inet6_sk(sk);
+
+		if (sk->sk_family != AF_INET6)
 			return -EINVAL;
 
-		val = *((int *)optval);
-		/* Only some options are supported */
-		switch (optname) {
-		case IPV6_TCLASS:
-			if (val < -1 || val > 0xff) {
-				ret = -EINVAL;
-			} else {
-				struct ipv6_pinfo *np = inet6_sk(sk);
+		if (optname == IPV6_RTHDR) {
+			struct ipv6_txoptions *opt;
 
-				if (val == -1)
-					val = 0;
-				np->tclass = val;
-			}
-			break;
-		default:
+			if (optlen == 0)
+				optval = NULL;
+			else if (!optval)
+				return -EINVAL;
+			else if (optlen < sizeof(struct ipv6_opt_hdr) ||
+				 optlen & 0x7 || optlen > 8 * 255)
+				return -EINVAL;
+			else if (ipv6_optlen((struct ipv6_opt_hdr *)optval) >
+				 optlen)
+				return -EINVAL;
+
+			opt = rcu_dereference_protected(np->opt,
+							lockdep_sock_is_held(sk));
+			opt = ipv6_renew_options(sk, opt, optname,
+						 (struct ipv6_opt_hdr *)optval);
+			if (IS_ERR(opt))
+				return PTR_ERR(opt);
+
 			ret = -EINVAL;
+			if (opt) {
+				struct ipv6_sr_hdr *srh = (struct ipv6_sr_hdr *)
+							  opt->srcrt;
+
+				if (!srh || srh->type != IPV6_SRCRT_TYPE_4)
+					goto sticky_done;
+
+				if (!seg6_validate_srh(srh, optlen))
+					goto sticky_done;
+			}
+
+			ret = 0;
+			opt = ipv6_update_options(sk, opt);
+sticky_done:
+			if (opt) {
+				atomic_sub(opt->tot_len, &sk->sk_omem_alloc);
+				txopt_put(opt);
+			}
+		} else {
+			if (optlen != sizeof(int))
+				return -EINVAL;
+
+			val = *((int *)optval);
+			/* Only some options are supported */
+			switch (optname) {
+			case IPV6_TCLASS:
+				if (val < -1 || val > 0xff) {
+					ret = -EINVAL;
+				} else {
+					if (val == -1)
+						val = 0;
+					np->tclass = val;
+				}
+				break;
+			default:
+				ret = -EINVAL;
+			}
 		}
 #endif
 	} else if (level == SOL_TCP &&
