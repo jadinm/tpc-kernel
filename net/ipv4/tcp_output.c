@@ -2610,6 +2610,12 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 	sent_pkts = 0;
 
 	tcp_mstamp_refresh(tp);
+
+	/* Call a BPF program and if a modification was made
+	 * update the MSS */
+	if (tcp_call_bpf(sk, BPF_SOCK_OPS_TCP_XMIT, 0, NULL))
+		mss_now = tcp_current_mss(sk);
+
 	if (!push_one) {
 		/* Do MTU probing. */
 		result = tcp_mtu_probe(sk);
