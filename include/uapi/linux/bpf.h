@@ -5810,6 +5810,10 @@ enum {
 					 * by the kernel or the
 					 * earlier bpf-progs.
 					 */
+	BPF_SOCK_OPS_TCP_XMIT,		/* Called for every xmitted TCP skb
+					 */
+	BPF_SOCK_OPS_UDP_XMIT,		/* Called for every xmitted UDP skb
+					 */
 };
 
 /* List of TCP states. There is a build check in net/ipv4/tcp.c to detect
