@@ -5814,6 +5814,8 @@ enum {
 					 */
 	BPF_SOCK_OPS_UDP_XMIT,		/* Called for every xmitted UDP skb
 					 */
+	BPF_SOCK_OPS_ECN_EX,		/* Called when ECN is experienced
+					 */
 };
 
 /* List of TCP states. There is a build check in net/ipv4/tcp.c to detect
