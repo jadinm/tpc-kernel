@@ -5814,7 +5814,7 @@ enum {
 					 */
 	BPF_SOCK_OPS_UDP_XMIT,		/* Called for every xmitted UDP skb
 					 */
-	BPF_SOCK_OPS_ECN_EX,		/* Called when ECN is experienced
+	BPF_SOCK_OPS_ECN_CE,		/* Called when ECN is experienced
 					 */
 };
 
