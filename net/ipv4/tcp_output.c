@@ -375,6 +375,7 @@ static void tcp_ecn_send(struct sock *sk, struct sk_buff *skb,
 			if (tp->ecn_flags & TCP_ECN_QUEUE_CWR) {
 				tp->ecn_flags &= ~TCP_ECN_QUEUE_CWR;
 				th->cwr = 1;
+				tcp_call_bpf(sk, BPF_SOCK_OPS_ECN_CE, 0, NULL);
 				skb_shinfo(skb)->gso_type |= SKB_GSO_TCP_ECN;
 			}
 		} else if (!tcp_ca_needs_ecn(sk)) {
