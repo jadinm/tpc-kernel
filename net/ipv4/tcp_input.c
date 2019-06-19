@@ -357,7 +357,6 @@ static void __tcp_ecn_check_ce(struct sock *sk, const struct sk_buff *skb)
 			tp->ecn_flags |= TCP_ECN_DEMAND_CWR;
 		}
 		tp->ecn_flags |= TCP_ECN_SEEN;
-		tcp_call_bpf(sk, BPF_SOCK_OPS_ECN_CE, 0, NULL);
 		break;
 	default:
 		if (tcp_ca_needs_ecn(sk))
