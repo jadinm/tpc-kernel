@@ -4833,6 +4833,14 @@ static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 				if (!srh || srh->type != IPV6_SRCRT_TYPE_4)
 					goto sticky_done;
 
+				/* BPF requires the size of the SRH to
+				 * setsockopt to be known in advance but we
+				 * might want to give a smaller SRH than the
+				 * allowed size.
+				 */
+				if (((srh->hdrlen + 1) << 3) < optlen)
+					optlen = (srh->hdrlen + 1) << 3;
+
 				if (!seg6_validate_srh(srh, optlen))
 					goto sticky_done;
 			}
