@@ -5223,6 +5223,419 @@ static const struct bpf_func_proto bpf_sock_ops_getsockopt_proto = {
 	.arg5_type	= ARG_CONST_SIZE,
 };
 
+
+#define FLOATING_BIAS 1024 /* == 2**10 - Above means positive exponent and below means negative one */
+#define FLOATING_LARGEST_BIT ((__u64) 1U) << 63U
+#define FLOATING_CONV_SCALE 1000000000 // For the division by two
+
+/* At most power to 64 */
+static __always_inline __u64 floating_u64_pow(__u64 base, __u32 exponent)
+{
+	__u32 i;
+	__u64 pow = 1;
+	for (i = 1; i <= 64; i++) { // -1024 is the maximum for an exponent in double
+        int xxx = i;
+		if (xxx <= exponent)
+			pow *= base;
+	}
+	return pow;
+}
+
+static __always_inline __u32 floating_decimal_to_binary(__u32 decimal, __u32 digits)
+{
+	// Encode the decimal as a sum of negative powers of 2
+	__u32 i = 1;
+	__u64 shift = 0;
+	__u64 scale = floating_u64_pow(10, digits);
+	__u32 sol = 0;
+	for (i = 1; i <= 32; i++) { // -1024 is the maximum for an exponent in double
+		sol = sol << 1U;
+		shift = ((__u64) decimal) << 1U;
+		decimal = decimal << 1U;
+		if (scale <= shift) {
+			sol = sol | 1U;
+			decimal -= scale;
+		}
+	}
+	return sol;
+}
+
+static __always_inline void floating_normalize(floating *number)
+{
+	// Get the position of the first 1 in the binary of the mantissa
+	// and change the exponent
+	__u32 i = 0;
+	__u32 found = 0;
+
+	if (!number->mantissa) {
+		number->exponent = FLOATING_BIAS;
+		return;
+	}
+
+	for (i = 0; i <= 63; i++) {
+        if (!found && (number->mantissa & FLOATING_LARGEST_BIT) != 0) {
+            found = 1;
+        } else if (!found) {
+            number->exponent = number->exponent - 1;
+            number->mantissa = number->mantissa << 1U;
+        }
+	}
+}
+
+static void to_floating(__u32 integer, __u32 decimal, __u32 digits, floating *result)
+{
+	result->mantissa = (((__u64) integer) << 32U) | ((__u64) floating_decimal_to_binary(decimal, digits));
+	result->exponent = FLOATING_BIAS + 31;
+	// The first bit must be 1
+	floating_normalize(result);
+}
+
+BPF_CALL_5(bpf_to_floating, __u32, integer, __u32, decimal, __u32, digits, floating *, result, __u32, result_len)
+{
+	if (result_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+	to_floating(integer, decimal, digits, result);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_to_floating_proto = {
+	.func		= bpf_to_floating,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_ANYTHING,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_ANYTHING,
+	.arg4_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg5_type	= ARG_CONST_SIZE,
+};
+
+/**
+ * Reverse of decimal_to_binary
+ */
+static __u32 floating_binary_to_decimal(__u32 decimal)
+{
+	__u32 i = 0;
+	__u32 sol = 0;
+	__u32 curr_bit = 0;
+	for (i = 0; i <= 31; i++) {
+		curr_bit = (decimal & (1U << i)) >> i;
+		decimal = decimal & ~(1U << i); // Clear the bit
+		sol = sol + curr_bit * ((__u32) FLOATING_CONV_SCALE);
+		sol /= 2;
+	}
+	return sol;
+}
+
+BPF_CALL_4(bpf_floating_to_u32s, floating *, number, __u32, number_len, __u64 *, int_dec, __u32, int_dec_len)
+{
+	__u32 *integer;
+	__u32 *decimal;
+	__u32 shift = 0;
+	__u32 decimal_shift = 0;
+
+	if (int_dec_len < sizeof(__u64)  || number_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+
+	integer = ((__u32 *) int_dec);
+	decimal = ((__u32 *) int_dec) + 1;
+	*integer = 0;
+
+	if (number->exponent >= FLOATING_BIAS) { // There is an integer part
+		shift = number->exponent + 1 - FLOATING_BIAS;
+	} else {
+		decimal_shift = FLOATING_BIAS - number->exponent - 1;
+	}
+	if (shift) { // Shifting mantissa more than 63 times would perform a wrapping
+		*integer = (__u32) (number->mantissa >> (64 - shift));
+	}
+
+	*decimal = (__u32) ((number->mantissa << shift) >> (decimal_shift + 32U));
+	*decimal = floating_binary_to_decimal(*decimal);
+	return 9;
+}
+
+static const struct bpf_func_proto bpf_floating_to_u32s_proto = {
+	.func		= bpf_floating_to_u32s,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg2_type	= ARG_CONST_SIZE,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg4_type	= ARG_CONST_SIZE,
+};
+
+static void floating_add(floating *terms, floating *result)
+{
+	floating first;
+	floating second;
+
+	if (terms[0].exponent > terms[1].exponent) {
+		first.mantissa = terms[0].mantissa;
+		first.exponent = terms[0].exponent;
+		second.mantissa = terms[1].mantissa;
+		second.exponent = terms[1].exponent;
+	} else {
+		first.mantissa = terms[1].mantissa;
+		first.exponent = terms[1].exponent;
+		second.mantissa = terms[0].mantissa;
+		second.exponent = terms[0].exponent;
+	}
+
+	if (first.exponent - second.exponent + 1 < 64)
+		second.mantissa = second.mantissa >> (first.exponent - second.exponent + 1);
+	else
+		second.mantissa = 0;
+	first.mantissa = first.mantissa >> 1U; // Just in case of overflow
+
+	result->exponent = first.exponent + 1;
+	result->mantissa = first.mantissa + second.mantissa;
+	floating_normalize(result);
+}
+
+BPF_CALL_4(bpf_floating_add, floating *, terms, __u32, terms_len, floating *, result, __u32, result_len)
+{
+	if (terms_len < sizeof(floating) * 2  || result_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+	floating_add(terms, result);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_floating_add_proto = {
+	.func		= bpf_floating_add,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg2_type	= ARG_CONST_SIZE,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg4_type	= ARG_CONST_SIZE,
+};
+
+static void floating_multiply(floating *factors, floating *result)
+{
+	result->mantissa = (factors[0].mantissa >> 32U) * (factors[1].mantissa >> 32U);
+	result->exponent = factors[0].exponent + factors[1].exponent - FLOATING_BIAS + 1;
+}
+
+BPF_CALL_4(bpf_floating_multiply, floating *, factors, __u32, factors_len, floating *, result, __u32, result_len)
+{
+	if (factors_len < sizeof(floating) * 2  || result_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+	floating_multiply(factors, result);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_floating_multiply_proto = {
+	.func		= bpf_floating_multiply,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg2_type	= ARG_CONST_SIZE,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg4_type	= ARG_CONST_SIZE,
+};
+
+struct euclidian_arg {
+	__u32 i;
+	__u64 numerator;
+	__u64 denominator;
+	__u64 remainder[2];
+	__u32 first_one;
+	__u64 sol;
+};
+
+static __u64 euclidian_division_inner(struct euclidian_arg *arg)
+{
+	__u64 carry = 0;
+
+	// R := R << 1
+	arg->remainder[1] = arg->remainder[1] << 1U;
+	if (arg->remainder[0] & FLOATING_LARGEST_BIT) {
+		arg->remainder[1] += 1;
+	}
+	arg->remainder[0] = arg->remainder[0] << 1U;
+
+	// R(0) := N(i)
+	if (arg->i - 1 >= 64) {
+		// numerator is limited to 64bits => no need to change remainder[1]
+		arg->remainder[0] |= (arg->numerator & (((__u64) 1) << (arg->i - 1 - 64))) >> (arg->i - 1 - 64);
+	}
+
+	// if R ≥ D then
+	// R := R − D
+	if (arg->remainder[1]) {
+		arg->remainder[1] -= 1;
+		carry = ((~((__u64) 0)) - arg->denominator) + 1;
+		arg->remainder[0] = arg->remainder[0] + carry;
+
+		// Q(i) := 1
+		if (!arg->first_one)
+			arg->first_one = arg->i;
+		arg->sol |= (((__u64) 1) << ((63 + arg->i) - arg->first_one));
+	} else if (arg->remainder[0] >= arg->denominator) {
+		arg->remainder[0] = arg->remainder[0] - arg->denominator;
+
+		// Q(i) := 1
+		if (!arg->first_one)
+			arg->first_one = arg->i;
+		arg->sol |= (((__u64) 1) << ((63 + arg->i) - arg->first_one));
+	}
+
+	return arg->sol;
+}
+
+static __u64 euclidian_division(__u64 numerator, __u64 denominator)
+{
+	/*
+	if D = 0 then error(DivisionByZeroException) end
+	Q := 0                  -- Initialize quotient and remainder to zero
+	R := 0
+	for i := n − 1 .. 0 do  -- Where n is number of bits in N
+	  R := R << 1           -- Left-shift R by 1 bit
+	  R(0) := N(i)          -- Set the least-significant bit of R equal to bit i of the numerator
+	  if R ≥ D then
+	    R := R − D
+	    Q(i) := 1
+	  end
+	end
+	 */
+
+    __u32 iterator;
+	struct euclidian_arg arg;
+	arg.numerator = numerator;
+	arg.denominator = denominator;
+	arg.remainder[0] = 0;
+	arg.remainder[1] = 0;
+	arg.first_one = 0;
+	arg.sol = 0;
+	for (iterator = 0; iterator <= 127; iterator++) { // XXX Does not unroll
+        int j = iterator;
+        arg.i = 128 - j;
+		if (!(arg.first_one && arg.first_one - arg.i - 1 >= 63)) {
+			euclidian_division_inner(&arg);
+		}
+	}
+	return arg.sol;
+}
+
+static void floating_divide(floating numerator, floating denominator, floating *result)
+{
+	if (numerator.mantissa != 0 && denominator.mantissa != 0) {
+		result->mantissa = euclidian_division(numerator.mantissa, denominator.mantissa);
+		result->exponent = (FLOATING_BIAS + numerator.exponent) - denominator.exponent - 1;
+		if (numerator.mantissa > denominator.mantissa)
+			result->exponent += 1;
+		//bpf_printk("mantissa 0x%llx - num 0x%llx - den 0x%llx\n", result.mantissa, numerator.mantissa, denominator.mantissa);
+		//bpf_printk("exponent %u - num %u - den %u\n", result.exponent, numerator.exponent, denominator.exponent);
+		return;
+	}
+	result->mantissa = 0;
+    result->exponent = FLOATING_BIAS;
+}
+
+BPF_CALL_4(bpf_floating_divide, floating *, operands, __u32, operands_len, floating *, result, __u32, result_len)
+{
+	if (operands_len < sizeof(floating) * 2  || result_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+	floating_divide(operands[0], operands[1], result);
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_floating_divide_proto = {
+	.func		= bpf_floating_divide,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg2_type	= ARG_CONST_SIZE,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg4_type	= ARG_CONST_SIZE,
+};
+
+struct exp_args {
+	__u32 i;
+	floating a;
+	floating sum_taylor;
+	floating one;
+};
+
+static void float_e_power_a_inner(struct exp_args *arg) {
+	floating it;
+	floating div_result;
+	floating prod_result;
+	floating operands [2];
+	to_floating(arg->i, 0, 1, &it);
+
+	operands[0] = arg->sum_taylor;
+	operands[1] = it;
+	floating_divide(arg->sum_taylor, it, &div_result);
+
+	operands[0] = div_result;
+	operands[1] = arg->a;
+	floating_multiply(operands, &prod_result);
+
+	operands[0] = prod_result;
+	operands[1] = arg->one;
+	floating_add(operands, &arg->sum_taylor);
+}
+
+#define FLOATING_TAYLOR_SUM_MAX	100
+
+BPF_CALL_4(bpf_floating_e_power_a, floating *, exponent, __u32, exponent_len, floating *, result, __u32, result_len)
+{
+	/*
+		uint64_t sum = 1.0;
+		for (int i = FLOATING_TAYLOR_SUM_MAX - 1; i > 0; --i)
+		    sum = (1 + a * sum / i);
+
+		return sum;
+	*/
+	__u32 tmp_i = 0;
+	struct exp_args arg;
+	if (exponent_len < sizeof(floating)  || result_len < sizeof(floating)) {
+		return -EINVAL;
+	}
+
+    to_floating(1, 0, 1, &arg.one);
+	arg.a.mantissa = exponent->mantissa;
+	arg.a.exponent = exponent->exponent;
+	arg.sum_taylor.exponent = arg.one.exponent;
+	arg.sum_taylor.mantissa = arg.one.mantissa;
+
+	for (tmp_i = FLOATING_TAYLOR_SUM_MAX - 1; tmp_i > 0; tmp_i--) {
+		arg.i = tmp_i;
+		float_e_power_a_inner(&arg);
+	}
+
+	result->mantissa = arg.sum_taylor.mantissa;
+	result->exponent = arg.sum_taylor.exponent;
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_floating_e_power_a_proto = {
+	.func		= bpf_floating_e_power_a,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg2_type	= ARG_CONST_SIZE,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	// We need a length parameter after a mem pointer so that eBPF knows what to copy
+	.arg4_type	= ARG_CONST_SIZE,
+};
+
 BPF_CALL_2(bpf_sock_ops_cb_flags_set, struct bpf_sock_ops_kern *, bpf_sock,
 	   int, argval)
 {

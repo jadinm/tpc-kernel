@@ -4951,7 +4951,20 @@ union bpf_attr {
 	FN(sys_bpf),			\
 	FN(btf_find_by_name_kind),	\
 	FN(sys_close),			\
+	FN(to_floating),		\
+	FN(floating_to_u32s),	\
+	FN(floating_add),		\
+	FN(floating_multiply),	\
+	FN(floating_divide),	\
+	FN(floating_e_power_a),	\
 	/* */
+
+struct floating_type {
+	__u64 mantissa; // We use the full mantissa
+	__u32 exponent; // We only use 11 bits for the exponent (as in a double)
+} __attribute__((packed));
+
+typedef struct floating_type floating;
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call

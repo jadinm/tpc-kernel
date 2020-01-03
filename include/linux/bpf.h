@@ -1999,6 +1999,13 @@ extern const struct bpf_func_proto bpf_task_storage_delete_proto;
 extern const struct bpf_func_proto bpf_for_each_map_elem_proto;
 extern const struct bpf_func_proto bpf_btf_find_by_name_kind_proto;
 
+extern const struct bpf_func_proto bpf_to_floating_proto;
+extern const struct bpf_func_proto bpf_floating_to_u32s_proto;
+extern const struct bpf_func_proto bpf_floating_add_proto;
+extern const struct bpf_func_proto bpf_floating_multiply_proto;
+extern const struct bpf_func_proto bpf_floating_divide_proto;
+extern const struct bpf_func_proto bpf_floating_e_power_a_proto;
+
 const struct bpf_func_proto *bpf_tracing_func_proto(
 	enum bpf_func_id func_id, const struct bpf_prog *prog);
 

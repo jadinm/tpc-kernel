@@ -109,6 +109,18 @@ lirc_mode2_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_tail_call_proto;
 	case BPF_FUNC_get_prandom_u32:
 		return &bpf_get_prandom_u32_proto;
+	case BPF_FUNC_to_floating:
+		return &bpf_to_floating_proto;
+	case BPF_FUNC_floating_to_u32s:
+		return &bpf_floating_to_u32s_proto;
+	case BPF_FUNC_floating_add:
+		return &bpf_floating_add_proto;
+	case BPF_FUNC_floating_multiply:
+		return &bpf_floating_multiply_proto;
+	case BPF_FUNC_floating_divide:
+		return &bpf_floating_divide_proto;
+	case BPF_FUNC_floating_e_power_a:
+		return &bpf_floating_e_power_a_proto;
 	case BPF_FUNC_trace_printk:
 		if (perfmon_capable())
 			return bpf_get_trace_printk_proto();

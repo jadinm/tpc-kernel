@@ -2345,6 +2345,13 @@ const struct bpf_func_proto bpf_get_ns_current_pid_tgid_proto __weak;
 const struct bpf_func_proto bpf_snprintf_btf_proto __weak;
 const struct bpf_func_proto bpf_seq_printf_btf_proto __weak;
 
+const struct bpf_func_proto bpf_to_floating_proto __weak;
+const struct bpf_func_proto bpf_floating_to_u32s_proto __weak;
+const struct bpf_func_proto bpf_floating_add_proto __weak;
+const struct bpf_func_proto bpf_floating_multiply_proto __weak;
+const struct bpf_func_proto bpf_floating_divide_proto __weak;
+const struct bpf_func_proto bpf_floating_e_power_a_proto __weak;
+
 const struct bpf_func_proto * __weak bpf_get_trace_printk_proto(void)
 {
 	return NULL;

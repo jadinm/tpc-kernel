@@ -1059,6 +1059,18 @@ bpf_tracing_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_for_each_map_elem_proto;
 	case BPF_FUNC_snprintf:
 		return &bpf_snprintf_proto;
+	case BPF_FUNC_to_floating:
+		return &bpf_to_floating_proto;
+	case BPF_FUNC_floating_to_u32s:
+		return &bpf_floating_to_u32s_proto;
+	case BPF_FUNC_floating_add:
+		return &bpf_floating_add_proto;
+	case BPF_FUNC_floating_multiply:
+		return &bpf_floating_multiply_proto;
+	case BPF_FUNC_floating_divide:
+		return &bpf_floating_divide_proto;
+	case BPF_FUNC_floating_e_power_a:
+		return &bpf_floating_e_power_a_proto;
 	default:
 		return NULL;
 	}
