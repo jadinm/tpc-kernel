@@ -5494,7 +5494,7 @@ static __u64 euclidian_division_inner(struct euclidian_arg *arg)
 	return arg->sol;
 }
 
-static __u64 euclidian_division(__u64 numerator, __u64 denominator)
+static __u64 euclidian_division(__u64 numerator, __u64 denominator, __u32 *decreased)
 {
 	/*
 	if D = 0 then error(DivisionByZeroException) end
@@ -5525,16 +5525,19 @@ static __u64 euclidian_division(__u64 numerator, __u64 denominator)
 			euclidian_division_inner(&arg);
 		}
 	}
+	*decreased = arg.first_one;
 	return arg.sol;
 }
 
 static void floating_divide(floating numerator, floating denominator, floating *result)
 {
+	__u32 decreased = 0;
 	if (numerator.mantissa != 0 && denominator.mantissa != 0) {
-		result->mantissa = euclidian_division(numerator.mantissa, denominator.mantissa);
-		result->exponent = (FLOATING_BIAS + numerator.exponent) - denominator.exponent - 1;
-		if (numerator.mantissa > denominator.mantissa)
-			result->exponent += 1;
+		result->mantissa = euclidian_division(numerator.mantissa, denominator.mantissa, &decreased);
+		result->exponent = (FLOATING_BIAS + numerator.exponent) - denominator.exponent;
+		if (numerator.mantissa < denominator.mantissa) {
+			result->exponent -= (65 - decreased);
+		}
 		//bpf_printk("mantissa 0x%llx - num 0x%llx - den 0x%llx\n", result.mantissa, numerator.mantissa, denominator.mantissa);
 		//bpf_printk("exponent %u - num %u - den %u\n", result.exponent, numerator.exponent, denominator.exponent);
 		return;
