@@ -366,10 +366,10 @@ int tcp_set_congestion_control(struct sock *sk, const char *name, bool load,
 		ca = tcp_ca_find_autoload(sock_net(sk), name);
 
 	/* No change asking for existing value */
-	if (ca == icsk->icsk_ca_ops) {
+	/*if (ca == icsk->icsk_ca_ops) {
 		icsk->icsk_ca_setsockopt = 1;
 		goto out;
-	}
+	}*/
 
 	if (!ca)
 		err = -ENOENT;
