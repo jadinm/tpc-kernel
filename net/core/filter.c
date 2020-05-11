@@ -5422,6 +5422,7 @@ static void floating_multiply(floating *factors, floating *result)
 {
 	result->mantissa = (factors[0].mantissa >> 32U) * (factors[1].mantissa >> 32U);
 	result->exponent = factors[0].exponent + factors[1].exponent - FLOATING_BIAS + 1;
+	floating_normalize(result);
 }
 
 BPF_CALL_4(bpf_floating_multiply, floating *, factors, __u32, factors_len, floating *, result, __u32, result_len)
@@ -5538,6 +5539,7 @@ static void floating_divide(floating numerator, floating denominator, floating *
 		if (numerator.mantissa < denominator.mantissa) {
 			result->exponent -= (65 - decreased);
 		}
+		floating_normalize(result);
 		//bpf_printk("mantissa 0x%llx - num 0x%llx - den 0x%llx\n", result.mantissa, numerator.mantissa, denominator.mantissa);
 		//bpf_printk("exponent %u - num %u - den %u\n", result.exponent, numerator.exponent, denominator.exponent);
 		return;
