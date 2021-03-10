@@ -4927,6 +4927,7 @@ sticky_done:
 				else
 					tp->save_syn = val;
 				break;
+<<<<<<< HEAD
 			case TCP_KEEPIDLE:
 				ret = tcp_sock_set_keepidle_locked(sk, val);
 				break;
@@ -4960,6 +4961,19 @@ sticky_done:
 				break;
 			case TCP_WINDOW_CLAMP:
 				ret = tcp_set_window_clamp(sk, val);
+=======
+			case TCP_PATH_CHANGED:
+				if (val < 0 || val > 1) {
+					ret = -EINVAL;
+				} else {
+					// Reset RTO
+					if (__tcp_set_rto(tp)) {
+						// Reset timeout to half of RTT-based value because backoff is going to be incremented
+						inet_csk(sk)->icsk_rto = min(__tcp_set_rto(tp), TCP_RTO_MAX) >> 1;
+					}
+					inet_csk(sk)->icsk_backoff = 0; // Reset backoff counter
+				}
+>>>>>>> c59341259ebd (Add SO_MAX_PACING_RATE TCP_MAXSEG 'last sent time' 'last receive time' and 'path change notification' socket options)
 				break;
 			default:
 				ret = -EINVAL;
@@ -4997,6 +5011,11 @@ static int _bpf_getsockopt(struct sock *sk, int level, int optname,
 		case SO_REUSEPORT:
 			*((int *)optval) = sk->sk_reuseport;
 			break;
+		case SO_MAX_PACING_RATE:
+			if (optlen < sizeof(__u32))
+				goto err_clear;
+			*((__u32 *)optval) = min_t(__u32, sk->sk_max_pacing_rate, ~0U);
+			break;
 		default:
 			goto err_clear;
 		}
@@ -5021,6 +5040,29 @@ static int _bpf_getsockopt(struct sock *sk, int level, int optname,
 			    optlen > tcp_saved_syn_len(tp->saved_syn))
 				goto err_clear;
 			memcpy(optval, tp->saved_syn->data, optlen);
+			break;
+		case TCP_MAXSEG:
+			tp = tcp_sk(sk);
+			if (optlen < sizeof(__u32))
+				goto err_clear;
+
+			*((__u32 *)optval) = tp->mss_cache;
+			if (!*optval && ((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN)))
+				*((__u32 *)optval) = (__u32) tp->rx_opt.user_mss;
+			if (tp->repair)
+				*((__u32 *)optval) = (__u32) tp->rx_opt.mss_clamp;
+			break;
+		case 40: // last sent time
+			tp = tcp_sk(sk);
+			if (optlen < sizeof(__u32))
+				goto err_clear;
+			*((__u32 *)optval) = tp->lsndtime;
+			break;
+		case 41: // last receive time
+			icsk = inet_csk(sk);
+			if (optlen < sizeof(__u32))
+				goto err_clear;
+			*((__u32 *)optval) = icsk->icsk_ack.lrcvtime;
 			break;
 		default:
 			goto err_clear;

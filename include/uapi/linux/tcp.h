@@ -129,6 +129,8 @@ enum {
 
 #define TCP_TX_DELAY		37	/* delay outgoing packets by XX usec */
 
+#define TCP_PATH_CHANGED	38 /* Warn the connection that the path has changed */
+
 
 #define TCP_REPAIR_ON		1
 #define TCP_REPAIR_OFF		0
