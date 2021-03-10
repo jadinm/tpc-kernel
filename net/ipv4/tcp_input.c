@@ -3786,6 +3786,9 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 		if (tcp_ecn_rcv_ecn_echo(tp, tcp_hdr(skb))) {
 			flag |= FLAG_ECE;
 			ack_ev_flags |= CA_ACK_ECE;
+			printk("%s: ECE Received - Before calling BPF %d\n", __func__, BPF_SOCK_OPS_ECN_ECE);
+			tcp_call_bpf(sk, BPF_SOCK_OPS_ECN_ECE, 0, NULL); //TODO
+			printk("%s: ECE Received - After calling BPF\n", __func__);
 		}
 
 		if (sack_state.sack_delivered)
@@ -5627,6 +5630,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 		if (!th->rst) {
 			if (th->syn)
 				goto syn_challenge;
+
+			tcp_call_bpf(sk, BPF_SOCK_OPS_DUPACK, 0, NULL);
 			if (!tcp_oow_rate_limited(sock_net(sk), skb,
 						  LINUX_MIB_TCPACKSKIPPEDSEQ,
 						  &tp->last_oow_ack_time))
