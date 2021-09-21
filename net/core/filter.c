@@ -5048,10 +5048,16 @@ sticky_done:
 				if (val < 0 || val > 1) {
 					ret = -EINVAL;
 				} else {
+					//printk("%s called\n", __func__);
+					//printk("%s before: RTO %u - RTO_MIN %u - RTO_MAX %u\n", __func__, jiffies_to_usecs(inet_csk(sk)->icsk_rto), jiffies_to_usecs(TCP_RTO_MIN), jiffies_to_usecs(TCP_RTO_MAX));
+					//printk("%s before: srtt %u - rttvar %u\n", __func__, (tp->srtt_us >> 3), tp->rttvar_us);
 					// Reset RTO
 					if (__tcp_set_rto(tp)) {
+						//printk("\t passes\n", __func__);
 						// Reset timeout to half of RTT-based value because backoff is going to be incremented
 						inet_csk(sk)->icsk_rto = min(__tcp_set_rto(tp), TCP_RTO_MAX) >> 1;
+						//printk("%s after: RTO %u - RTO_MIN %u - RTO_MAX %u\n", __func__, jiffies_to_usecs(inet_csk(sk)->icsk_rto), jiffies_to_usecs(TCP_RTO_MIN), jiffies_to_usecs(TCP_RTO_MAX));
+						//printk("%s after: srtt %u - rttvar %u\n", __func__, (tp->srtt_us >> 3), tp->rttvar_us);
 					}
 					inet_csk(sk)->icsk_backoff = 0; // Reset backoff counter
 				}
@@ -5663,8 +5669,6 @@ static void floating_divide(floating numerator, floating denominator, floating *
 			result->exponent -= (65 - decreased);
 		}
 		floating_normalize(result);
-		//bpf_printk("mantissa 0x%llx - num 0x%llx - den 0x%llx\n", result.mantissa, numerator.mantissa, denominator.mantissa);
-		//bpf_printk("exponent %u - num %u - den %u\n", result.exponent, numerator.exponent, denominator.exponent);
 		return;
 	}
 	result->mantissa = 0;
