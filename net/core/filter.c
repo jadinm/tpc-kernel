@@ -4682,6 +4682,89 @@ static const struct bpf_func_proto bpf_get_socket_uid_proto = {
 	.arg1_type      = ARG_PTR_TO_CTX,
 };
 
+/**
+ * Returns the success code of the pure ack transmission to trigger TCP keepalive
+ */
+BPF_CALL_1(bpf_send_ack, struct bpf_sock_ops_kern *, bpf_sock)
+{
+	return tcp_xmit_probe_skb(bpf_sock->sk, 0, LINUX_MIB_TCPKEEPALIVE);
+}
+
+static const struct bpf_func_proto bpf_send_ack_proto =  {
+	.func		= bpf_send_ack,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX
+};
+
+void generic_timer_handler(struct timer_list *t)
+{
+	struct ebpf_timer *timer = from_timer(timer, t, base);
+	// printk("%s: TIMER CALLBACK with operation %u\n", __func__, timer->operation);
+
+	bh_lock_sock(timer->sk);
+	if (sock_owned_by_user(timer->sk)) {
+		mod_timer(&timer->base, jiffies + HZ/20);
+		bh_unlock_sock(timer->sk);
+		return;
+	}
+
+	// printk("%s: TIMER CALLBACK LOCK ACQUIRED with operation %u\n", __func__, timer->operation);
+
+	tcp_call_bpf(timer->sk, timer->operation, 0, NULL);
+
+	// printk("%s: TIMER CALLBACK EBPF CALLED with operation %u\n", __func__, timer->operation);
+
+	/* Free structures */
+	bh_unlock_sock(timer->sk);
+	sock_put(timer->sk); // The socket can now be freed if last refcount
+	kfree(timer);
+
+	// printk("%s: TIMER CALLBACK STRUCTURES FREED with operation %u\n", __func__, timer->operation);
+}
+
+/**
+ * Returns the code that will be used to call the eBPF array of programs of the socket
+ * after a given duration in milliseconds
+ */
+BPF_CALL_2(bpf_start_timer, struct bpf_sock_ops_kern *, bpf_sock,
+	   u64, duration)
+{
+	struct sock *sk = bpf_sock->sk;
+	// TODO Get a list of ids for the socket
+	int ret = 1000;
+	struct ebpf_timer *timer = NULL;
+
+	u64 extra_duration = (duration * HZ) / 1000;
+	if (extra_duration == 0)
+		return -EINVAL;
+
+	// printk("%s: START TIMER OF %llu\n", __func__, duration);
+
+	// Intialize a timer
+	timer = kmalloc(sizeof(struct ebpf_timer), GFP_ATOMIC);
+	if (!timer)
+		return -ENOMEM;
+	timer_setup(&timer->base, generic_timer_handler, 0);
+	timer->sk = sk;
+	timer->operation = ret;
+	sock_hold(sk); // Prevent the socket free
+
+	// Start the timer
+	mod_timer(&timer->base, jiffies + extra_duration);
+	// printk("%s: TIMER OF %llu STARTED\n", __func__, duration);
+
+	return ret;
+}
+
+static const struct bpf_func_proto bpf_start_timer_proto =  {
+	.func		= bpf_start_timer,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_ANYTHING,
+};
+
 static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 			   char *optval, int optlen)
 {
@@ -4927,7 +5010,6 @@ sticky_done:
 				else
 					tp->save_syn = val;
 				break;
-<<<<<<< HEAD
 			case TCP_KEEPIDLE:
 				ret = tcp_sock_set_keepidle_locked(sk, val);
 				break;
@@ -4961,7 +5043,7 @@ sticky_done:
 				break;
 			case TCP_WINDOW_CLAMP:
 				ret = tcp_set_window_clamp(sk, val);
-=======
+				break;
 			case TCP_PATH_CHANGED:
 				if (val < 0 || val > 1) {
 					ret = -EINVAL;
@@ -4973,7 +5055,6 @@ sticky_done:
 					}
 					inet_csk(sk)->icsk_backoff = 0; // Reset backoff counter
 				}
->>>>>>> c59341259ebd (Add SO_MAX_PACING_RATE TCP_MAXSEG 'last sent time' 'last receive time' and 'path change notification' socket options)
 				break;
 			default:
 				ret = -EINVAL;

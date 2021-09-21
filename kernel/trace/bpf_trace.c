@@ -1071,6 +1071,10 @@ bpf_tracing_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_floating_divide_proto;
 	case BPF_FUNC_floating_e_power_a:
 		return &bpf_floating_e_power_a_proto;
+	case BPF_FUNC_start_timer:
+		return &bpf_start_timer_proto;
+	case BPF_FUNC_send_ack:
+		return &bpf_send_ack_proto;
 	default:
 		return NULL;
 	}

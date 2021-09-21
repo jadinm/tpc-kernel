@@ -2006,6 +2006,9 @@ extern const struct bpf_func_proto bpf_floating_multiply_proto;
 extern const struct bpf_func_proto bpf_floating_divide_proto;
 extern const struct bpf_func_proto bpf_floating_e_power_a_proto;
 
+extern const struct bpf_func_proto bpf_start_timer_proto;
+extern const struct bpf_func_proto bpf_send_ack_proto;
+
 const struct bpf_func_proto *bpf_tracing_func_proto(
 	enum bpf_func_id func_id, const struct bpf_prog *prog);
 

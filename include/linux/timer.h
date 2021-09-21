@@ -23,6 +23,12 @@ struct timer_list {
 #endif
 };
 
+struct ebpf_timer {
+	struct timer_list base; // Base timer information
+	struct sock *sk; // Socket on which eBPF programs will be called
+	__u32 operation;
+};
+
 #ifdef CONFIG_LOCKDEP
 /*
  * NB: because we have to copy the lockdep_map, setting the lockdep_map key

@@ -2352,6 +2352,9 @@ const struct bpf_func_proto bpf_floating_multiply_proto __weak;
 const struct bpf_func_proto bpf_floating_divide_proto __weak;
 const struct bpf_func_proto bpf_floating_e_power_a_proto __weak;
 
+const struct bpf_func_proto bpf_start_timer_proto __weak;
+const struct bpf_func_proto bpf_send_ack_proto __weak;
+
 const struct bpf_func_proto * __weak bpf_get_trace_printk_proto(void)
 {
 	return NULL;

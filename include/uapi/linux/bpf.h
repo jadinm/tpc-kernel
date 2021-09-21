@@ -4957,6 +4957,8 @@ union bpf_attr {
 	FN(floating_multiply),	\
 	FN(floating_divide),	\
 	FN(floating_e_power_a),	\
+	FN(start_timer),		\
+	FN(send_ack),			\
 	/* */
 
 struct floating_type {
