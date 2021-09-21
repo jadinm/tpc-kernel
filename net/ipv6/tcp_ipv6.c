@@ -1467,6 +1467,7 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	struct ipv6_pinfo *np = tcp_inet6_sk(sk);
 	struct sk_buff *opt_skb = NULL;
 	struct tcp_sock *tp;
+	struct bpf_sock_ops_kern sock_ops;
 
 	/* Imagine: socket is IPv6. IPv4 packet arrives,
 	   goes to IPv4 receive handler and backlogged.
@@ -1578,6 +1579,18 @@ ipv6_pktoptions:
 			np->rcv_flowinfo = ip6_flowinfo(ipv6_hdr(opt_skb));
 		if (np->repflow)
 			np->flow_label = ip6_flowlabel(ipv6_hdr(opt_skb));
+
+		// Hook here to read any IPv6 extension header
+		memset(&sock_ops, 0, offsetof(struct bpf_sock_ops_kern, temp));
+		if (sk_fullsock(sk)) {
+			sock_ops.is_fullsock = 1;
+			sock_owned_by_me(sk);
+		}
+		sock_ops.op = BPF_SOCK_OPS_PARSE_EXT_HDR_CB;
+		sock_ops.sk = sk;
+		sock_ops.skb = skb;
+		BPF_CGROUP_RUN_PROG_SOCK_OPS(&sock_ops);
+
 		if (ipv6_opt_accepted(sk, opt_skb, &TCP_SKB_CB(opt_skb)->header.h6)) {
 			skb_set_owner_r(opt_skb, sk);
 			tcp_v6_restore_cb(opt_skb);
