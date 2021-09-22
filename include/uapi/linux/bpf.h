@@ -5888,6 +5888,8 @@ enum {
 					 */
 	BPF_SOCK_OPS_DUPACK,		/* Called when a duplicated acknowledgement is about to be sent
 					 */
+	BPF_SOCK_OPS_PARSE_EXT_HDR_CB,	/* Called when a packet with an extension header is received
+					 */
 };
 
 /* List of TCP states. There is a build check in net/ipv4/tcp.c to detect

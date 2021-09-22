@@ -4690,7 +4690,7 @@ BPF_CALL_1(bpf_send_ack, struct bpf_sock_ops_kern *, bpf_sock)
 	return tcp_xmit_probe_skb(bpf_sock->sk, 0, LINUX_MIB_TCPKEEPALIVE);
 }
 
-static const struct bpf_func_proto bpf_send_ack_proto =  {
+const struct bpf_func_proto bpf_send_ack_proto =  {
 	.func		= bpf_send_ack,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -4757,7 +4757,7 @@ BPF_CALL_2(bpf_start_timer, struct bpf_sock_ops_kern *, bpf_sock,
 	return ret;
 }
 
-static const struct bpf_func_proto bpf_start_timer_proto =  {
+const struct bpf_func_proto bpf_start_timer_proto =  {
 	.func		= bpf_start_timer,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -4924,7 +4924,7 @@ static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 				if (((srh->hdrlen + 1) << 3) < optlen)
 					optlen = (srh->hdrlen + 1) << 3;
 
-				if (!seg6_validate_srh(srh, optlen))
+				if (!seg6_validate_srh(srh, optlen, false))
 					goto sticky_done;
 			}
 
@@ -5428,7 +5428,7 @@ BPF_CALL_5(bpf_to_floating, __u32, integer, __u32, decimal, __u32, digits, float
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_to_floating_proto = {
+const struct bpf_func_proto bpf_to_floating_proto = {
 	.func		= bpf_to_floating,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -5486,7 +5486,7 @@ BPF_CALL_4(bpf_floating_to_u32s, floating *, number, __u32, number_len, __u64 *,
 	return 9;
 }
 
-static const struct bpf_func_proto bpf_floating_to_u32s_proto = {
+const struct bpf_func_proto bpf_floating_to_u32s_proto = {
 	.func		= bpf_floating_to_u32s,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -5535,7 +5535,7 @@ BPF_CALL_4(bpf_floating_add, floating *, terms, __u32, terms_len, floating *, re
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_floating_add_proto = {
+const struct bpf_func_proto bpf_floating_add_proto = {
 	.func		= bpf_floating_add,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -5563,7 +5563,7 @@ BPF_CALL_4(bpf_floating_multiply, floating *, factors, __u32, factors_len, float
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_floating_multiply_proto = {
+const struct bpf_func_proto bpf_floating_multiply_proto = {
 	.func		= bpf_floating_multiply,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -5684,7 +5684,7 @@ BPF_CALL_4(bpf_floating_divide, floating *, operands, __u32, operands_len, float
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_floating_divide_proto = {
+const struct bpf_func_proto bpf_floating_divide_proto = {
 	.func		= bpf_floating_divide,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
@@ -5756,7 +5756,7 @@ BPF_CALL_4(bpf_floating_e_power_a, floating *, exponent, __u32, exponent_len, fl
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_floating_e_power_a_proto = {
+const struct bpf_func_proto bpf_floating_e_power_a_proto = {
 	.func		= bpf_floating_e_power_a,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,

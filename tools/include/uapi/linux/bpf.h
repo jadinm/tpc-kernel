@@ -5014,6 +5014,13 @@ union bpf_attr {
 	FN(send_ack),			\
 	/* */
 
+struct floating_type {
+	__u64 mantissa; // We use the full mantissa
+	__u32 exponent; // We only use 11 bits for the exponent (as in a double)
+} __attribute__((packed));
+
+typedef struct floating_type floating;
+
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
  */
@@ -5870,6 +5877,18 @@ enum {
 					 * has already been written
 					 * by the kernel or the
 					 * earlier bpf-progs.
+					 */
+	BPF_SOCK_OPS_TCP_XMIT,		/* Called for every xmitted TCP skb
+					 */
+	BPF_SOCK_OPS_UDP_XMIT,		/* Called for every xmitted UDP skb
+					 */
+	BPF_SOCK_OPS_ECN_CE,		/* Called when CWR is sent
+					 */
+	BPF_SOCK_OPS_ECN_ECE,		/* Called when ECE is received
+					 */
+	BPF_SOCK_OPS_DUPACK,		/* Called when a duplicated acknowledgement is about to be sent
+					 */
+	BPF_SOCK_OPS_PARSE_EXT_HDR_CB,	/* Called when a packet with an extension header is received
 					 */
 };
 
