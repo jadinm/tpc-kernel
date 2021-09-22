@@ -4780,6 +4780,59 @@ union bpf_attr {
  * 		Execute close syscall for given FD.
  * 	Return
  * 		A syscall result.
+ *
+ * int bpf_to_floating(u32 integer, u32 decimal, u32 digits, floating *result, u32 result_len)
+ * 	Description
+ * 		Creates a floating in result that contains the best approximation in floating of the number
+ * 		formed by an integer part "integer" and a decimal part "decimal" that describes "digits" number of digits
+ * 		after the comma in this number. The "result_len" is the size of the floating for the verifier.
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_floating_to_u32s(floating *number, u32 number_len, u64 *int_dec, u32 int_dec_len)
+ * 	Description
+ * 		Makes the reverse operation of bpf_to_floating. The "result_len" and "number_len" are sizes
+ * 		of the other arguments for the verifier.
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_floating_add(floating *terms, u32 terms_len, floating *result, u32 result_len)
+ * 	Description
+ * 		Add up to two floatings in "terms" and stores the result in "result"
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_floating_multiply(floating *factors, u32 factors_len, floating *result, u32 result_len)
+ * 	Description
+ * 		Multiply up to two floatings in "factors" and stores the result in "result"
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_floating_divide(floating *operands, u32 operands_len, floating *result, u32 result_len)
+ * 	Description
+ * 		Multiply up to two floatings in "operands" and stores the result in "result"
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_floating_e_power_a(floating *exponent, u32 exponent_len, floating *result, u32 result_len)
+ * 	Description
+ * 		Stores the result of e^exponent in "result"
+ * 	Return
+ * 		0 in case of success or 1
+ *
+ * int bpf_start_timer(void *ctx, u64 duration)
+ * 	Description
+ * 		Start a timer for the given "duration" in milliseconds.
+ * 		At the expiration of the timer, all of the eBPF codes in the cgroups are going to be called
+ * 		with the opcode returned by this function.
+ * 	Return
+ * 		The id of the timer or -ERROR in case of error
+ *
+ * int bpf_send_ack(void *ctx)
+ * 	Description
+ * 		Sends an ack probe
+ * 	Return
+ * 		0 in case of success or 1
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
