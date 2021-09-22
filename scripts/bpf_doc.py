@@ -594,6 +594,8 @@ class PrinterHelpers(Printer):
             'struct inode',
             'struct socket',
             'struct file',
+            'struct floating_type',
+            'floating',
     }
     mapped_types = {
             'u8': '__u8',
