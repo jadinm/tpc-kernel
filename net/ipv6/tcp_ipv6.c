@@ -1571,6 +1571,8 @@ ipv6_pktoptions:
 	tp = tcp_sk(sk);
 	if (TCP_SKB_CB(opt_skb)->end_seq == tp->rcv_nxt &&
 	    !((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN))) {
+		void *old_data;
+
 		if (np->rxopt.bits.rxinfo || np->rxopt.bits.rxoinfo)
 			np->mcast_oif = tcp_v6_iif(opt_skb);
 		if (np->rxopt.bits.rxhlim || np->rxopt.bits.rxohlim)
@@ -1588,8 +1590,13 @@ ipv6_pktoptions:
 		}
 		sock_ops.op = BPF_SOCK_OPS_PARSE_EXT_HDR_CB;
 		sock_ops.sk = sk;
-		sock_ops.skb = skb;
+		sock_ops.skb = opt_skb;
+		// We want to copy the network header
+		sock_ops.skb_data_end = skb_transport_header(opt_skb);
+		old_data = opt_skb->data;
+		opt_skb->data = skb_network_header(opt_skb);
 		BPF_CGROUP_RUN_PROG_SOCK_OPS(&sock_ops);
+		opt_skb->data = old_data;
 
 		if (ipv6_opt_accepted(sk, opt_skb, &TCP_SKB_CB(opt_skb)->header.h6)) {
 			skb_set_owner_r(opt_skb, sk);
