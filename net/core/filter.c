@@ -4939,7 +4939,7 @@ sticky_done:
 			/* All the trigger of the eBPF at each SRH and its save in the socket */
 			if (optlen < sizeof(int))
 				return -EINVAL;
-			np->rxopt.bits.srcrt = value != 0;
+			np->rxopt.bits.srcrt = optval != 0;
 			ret = 0;
 		} else {
 			if (optlen != sizeof(int))
