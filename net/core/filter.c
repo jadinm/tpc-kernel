@@ -4935,6 +4935,12 @@ sticky_done:
 				atomic_sub(opt->tot_len, &sk->sk_omem_alloc);
 				txopt_put(opt);
 			}
+		} else if (optname == IPV6_RECVRTHDR) {
+			/* All the trigger of the eBPF at each SRH and its save in the socket */
+			if (optlen < sizeof(int))
+				return -EINVAL;
+			np->rxopt.bits.srcrt = value != 0;
+			ret = 0;
 		} else {
 			if (optlen != sizeof(int))
 				return -EINVAL;
