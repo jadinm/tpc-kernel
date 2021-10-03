@@ -377,11 +377,13 @@ static int tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	const struct ipv6hdr *hdr = (const struct ipv6hdr *)skb->data;
 	const struct tcphdr *th = (struct tcphdr *)(skb->data+offset);
 	struct net *net = dev_net(skb->dev);
+	struct bpf_sock_ops_kern sock_ops;
 	struct request_sock *fastopen;
 	struct ipv6_pinfo *np;
 	struct tcp_sock *tp;
 	__u32 seq, snd_una;
 	struct sock *sk;
+	void *old_data;
 	bool fatal;
 	int err;
 
@@ -504,6 +506,22 @@ static int tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		sk_error_report(sk);
 	} else
 		sk->sk_err_soft = err;
+
+	// Hook here to read any ICMPv6 for the TCP socket
+	memset(&sock_ops, 0, offsetof(struct bpf_sock_ops_kern, temp));
+	if (sk_fullsock(sk)) {
+		sock_ops.is_fullsock = 1;
+		sock_owned_by_me(sk);
+	}
+	sock_ops.op = BPF_SOCK_OPS_PARSE_ICMP_CB;
+	sock_ops.sk = sk;
+	sock_ops.skb = skb;
+	// We want to copy the outer IPv6 header as well as the ICMP header up to the inner TCP header
+	sock_ops.skb_data_end = (void *) (th + 1);
+	old_data = skb->data;
+	skb->data = (char *) ipv6_hdr(skb);
+	BPF_CGROUP_RUN_PROG_SOCK_OPS(&sock_ops);
+	skb->data = old_data;
 
 out:
 	bh_unlock_sock(sk);

@@ -5890,6 +5890,8 @@ enum {
 					 */
 	BPF_SOCK_OPS_PARSE_EXT_HDR_CB,	/* Called when a packet with an extension header is received
 					 */
+	BPF_SOCK_OPS_PARSE_ICMP_CB,	/* Called when an ICMP packet is received
+					 */
 };
 
 /* List of TCP states. There is a build check in net/ipv4/tcp.c to detect
