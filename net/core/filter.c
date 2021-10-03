@@ -4941,6 +4941,14 @@ sticky_done:
 				return -EINVAL;
 			np->rxopt.bits.srcrt = optval != 0;
 			ret = 0;
+		} else if (optname == IPV6_UNICAST_HOPS) {
+			if (optlen < sizeof(int))
+				return -EINVAL;
+			val = *((int *)optval);
+			if (val > 255 || val < -1)
+				return -EINVAL;
+			np->hop_limit = val;
+			ret = 0;
 		} else {
 			if (optlen != sizeof(int))
 				return -EINVAL;
@@ -5177,6 +5185,7 @@ static int _bpf_getsockopt(struct sock *sk, int level, int optname,
 #if IS_ENABLED(CONFIG_IPV6)
 	} else if (level == SOL_IPV6) {
 		struct ipv6_pinfo *np = inet6_sk(sk);
+		struct dst_entry *dst;
 
 		if (optlen != sizeof(int) || sk->sk_family != AF_INET6)
 			goto err_clear;
@@ -5185,6 +5194,20 @@ static int _bpf_getsockopt(struct sock *sk, int level, int optname,
 		switch (optname) {
 		case IPV6_TCLASS:
 			*((int *)optval) = (int)np->tclass;
+			break;
+		case IPV6_UNICAST_HOPS:
+			*((int *)optval) = np->hop_limit;
+
+			if (*((int *)optval) < 0) {
+				rcu_read_lock();
+				dst = __sk_dst_get(sk);
+				if (dst)
+					*((int *)optval) = ip6_dst_hoplimit(dst);
+				rcu_read_unlock();
+			}
+
+			if (*((int *)optval) < 0)
+				*((int *)optval) = sock_net(sk)->ipv6.devconf_all->hop_limit;
 			break;
 		default:
 			goto err_clear;
