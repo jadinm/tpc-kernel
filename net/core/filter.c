@@ -4729,12 +4729,10 @@ void generic_timer_handler(struct timer_list *t)
  * Returns the code that will be used to call the eBPF array of programs of the socket
  * after a given duration in milliseconds
  */
-BPF_CALL_2(bpf_start_timer, struct bpf_sock_ops_kern *, bpf_sock,
-	   u64, duration)
+BPF_CALL_3(bpf_start_timer, struct bpf_sock_ops_kern *, bpf_sock,
+	   u64, duration, u32, operation)
 {
 	struct sock *sk = bpf_sock->sk;
-	// TODO Get a list of ids for the socket
-	int ret = 1000;
 	struct ebpf_timer *timer = NULL;
 
 	u64 extra_duration = (duration * HZ) / 1000;
@@ -4749,14 +4747,14 @@ BPF_CALL_2(bpf_start_timer, struct bpf_sock_ops_kern *, bpf_sock,
 		return -ENOMEM;
 	timer_setup(&timer->base, generic_timer_handler, 0);
 	timer->sk = sk;
-	timer->operation = ret;
+	timer->operation = operation;
 	sock_hold(sk); // Prevent the socket free
 
 	// Start the timer
 	mod_timer(&timer->base, jiffies + extra_duration);
 	// printk("%s: TIMER OF %llu STARTED\n", __func__, duration);
 
-	return ret;
+	return 0;
 }
 
 const struct bpf_func_proto bpf_start_timer_proto =  {

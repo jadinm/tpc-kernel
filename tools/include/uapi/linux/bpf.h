@@ -4820,13 +4820,13 @@ union bpf_attr {
  * 	Return
  * 		0 in case of success or 1
  *
- * int bpf_start_timer(void *ctx, u64 duration)
+ * int bpf_start_timer(void *ctx, u64 duration, u32 opcode)
  * 	Description
  * 		Start a timer for the given "duration" in milliseconds.
  * 		At the expiration of the timer, all of the eBPF codes in the cgroups are going to be called
- * 		with the opcode returned by this function.
+ * 		with the opcode given as argument. The timer object is pointed by the value in the last argument.
  * 	Return
- * 		The id of the timer or -ERROR in case of error
+ * 		The opcode number or -ERROR in case of error
  *
  * int bpf_send_ack(void *ctx)
  * 	Description
