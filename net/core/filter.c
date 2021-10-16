@@ -4687,7 +4687,9 @@ static const struct bpf_func_proto bpf_get_socket_uid_proto = {
  */
 BPF_CALL_1(bpf_send_ack, struct bpf_sock_ops_kern *, bpf_sock)
 {
-	return tcp_xmit_probe_skb(bpf_sock->sk, 0, LINUX_MIB_TCPKEEPALIVE);
+	struct tcp_sock *tp = (struct tcp_sock *) bpf_sock->sk;
+	__tcp_send_ack(bpf_sock->sk, tp->rcv_nxt);
+	return 0;
 }
 
 const struct bpf_func_proto bpf_send_ack_proto =  {
